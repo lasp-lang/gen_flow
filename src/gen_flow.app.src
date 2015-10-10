@@ -1,0 +1,12 @@
+{application, gen_flow,
+ [
+  {description, "Generic abstraction for building dataflow computations."},
+  {vsn, "0.0.1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {modules, []},
+  {env, []}
+ ]}.

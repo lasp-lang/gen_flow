@@ -11,6 +11,9 @@ test: common_test
 deps:
 	$(REBAR) get-deps
 
+clean:
+	$(REBAR) clean
+
 common_test:
 	$(REBAR) ct
 

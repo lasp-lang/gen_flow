@@ -40,7 +40,8 @@
 
 -type state() :: state().
 
--record(state, {module :: atom(),
+-record(state, {pids :: [pid()],
+                module :: atom(),
                 module_state :: term(),
                 cache :: orddict:orddict()}).
 
@@ -65,6 +66,9 @@ start_link(Module, Args) ->
 
 %% @doc TODO
 init(Parent, Module, Args) ->
+    %% Trap exits from children.
+    process_flag(trap_exit, true),
+
     %% Initialize state.
     {ok, ModuleState} = case Module:init(Args) of
         {ok, InitState} ->
@@ -78,14 +82,21 @@ init(Parent, Module, Args) ->
     Debug = sys:debug_options([]),
 
     %% Initialize state.
-    State = #state{module=Module,
+    State = #state{pids=[],
+                   module=Module,
                    module_state=ModuleState,
                    cache=orddict:new()},
 
     loop(Parent, Debug, State).
 
 %% @doc TODO
-loop(Parent, Debug, #state{module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
+loop(Parent, Debug, #state{pids=Pids0, module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
+    %% Terminate pids that might still be running.
+    TerminateFun = fun(Pid) ->
+                           exit(Pid, kill)
+                   end,
+    [TerminateFun(Pid) || Pid <- Pids0],
+
     %% Get self.
     Self = self(),
 
@@ -103,19 +114,21 @@ loop(Parent, Debug, #state{module=Module, module_state=ModuleState0, cache=Cache
         end, Cache0, lists:seq(1, length(ReadFuns))),
 
     %% For each readfun, spawn a linked process to request values.
-    lists:foreach(fun(X) ->
+    Pids = lists:map(fun(X) ->
             ReadFun = lists:nth(X, ReadFuns),
             CachedValue = orddict:fetch(X, DefaultedCache),
-            spawn_link(fun() ->
-                            Value = ReadFun(CachedValue),
-                            Self ! {ok, X, Value}
-                    end)
+            Pid = spawn_link(fun() ->
+                                Value = ReadFun(CachedValue),
+                                Self ! {ok, X, Value}
+                        end),
+            Pid
         end, lists:seq(1, length(ReadFuns))),
 
     %% Wait for responses.
     receive
         {system, From, Request} ->
-            sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State);
+            sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State),
+            loop(Parent, Debug, State#state{module_state=ModuleState0, cache=Cache0, pids=Pids});
         {ok, X, V} ->
             %% Log result.
             Debug1 = sys:handle_debug(Debug,
@@ -133,12 +146,16 @@ loop(Parent, Debug, #state{module=Module, module_state=ModuleState0, cache=Cache
             {ok, ModuleState} = Module:process(RealizedCache, ReadState),
 
             %% Wait.
-            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache})
+            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache, pids=Pids})
+    after
+        60000 ->
+            %% If 60 seconds go by, relaunch.
+            loop(Parent, Debug, State#state{module_state=ModuleState0, cache=Cache0, pids=Pids})
     end.
 
 %% @private
 write_debug(Dev, Event, Name) ->
-        io:format(Dev, "~p event = ~p~n", [Name, Event]).
+    io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
 %% @private
 system_continue(Parent, Debug, State) ->

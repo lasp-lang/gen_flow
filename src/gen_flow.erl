@@ -22,7 +22,8 @@
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
 %% API
--export([start_link/2]).
+-export([start_link/1,
+         start_link/2]).
 
 %% System message callbacks
 -export([system_continue/3,
@@ -51,6 +52,10 @@
 %%% API
 %%%===================================================================
 
+start_link([Module, Args]) ->
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args]).
+
+%% @doc Provided for backwards compatibility.
 start_link(Module, Args) ->
     proc_lib:start_link(?MODULE, init, [self(), Module, Args]).
 

@@ -34,6 +34,9 @@
 %% Callbacks
 -export([init/3]).
 
+%% Ignore explicit termination warning.
+-dialyzer([{nowarn_function, [system_terminate/4]}]).
+
 %%%===================================================================
 %%% Behaviour
 %%%===================================================================

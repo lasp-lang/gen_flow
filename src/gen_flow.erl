@@ -149,7 +149,9 @@ loop(Parent, Debug, #state{pids=Pids0, module=Module, module_state=ModuleState0,
             {ok, ModuleState} = Module:process(RealizedCache, ReadState),
 
             %% Wait.
-            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache, pids=Pids})
+            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache, pids=Pids});
+        {'EXIT', Parent, Reason} ->
+            exit(Reason)
     after
         60000 ->
             %% If 60 seconds go by, relaunch.

@@ -195,4 +195,5 @@ terminate(Pids) ->
     TerminateFun = fun(Pid) ->
                            exit(Pid, kill)
                    end,
-    [TerminateFun(Pid) || Pid <- Pids].
+    _ = [TerminateFun(Pid) || Pid <- Pids],
+    ok.

@@ -23,7 +23,8 @@
 
 %% API
 -export([start_link/1,
-         start_link/2]).
+         start_link/2,
+         loop/3]).
 
 %% System message callbacks
 -export([system_continue/3,
@@ -130,6 +131,8 @@ loop(Parent, Debug,
         hibernate ->
             %% Terminate pids.
             terminate(Pids),
+            %% Clear the inbox so we don't wake up immediately
+            clear_inbox(),
 
             %% Hibernate
             proc_lib:hibernate(?MODULE,
@@ -188,6 +191,14 @@ system_get_state(State) ->
 system_replace_state(StateFun, State) ->
     NewState = StateFun(State),
     {ok, NewState, NewState}.
+
+%% @private
+clear_inbox() ->
+    receive
+        _ -> clear_inbox()
+    after
+        0 -> ok
+    end.
 
 %% @private
 terminate(Pids) ->

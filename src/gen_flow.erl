@@ -93,12 +93,10 @@ init(Parent, Module, Args) ->
     loop(Parent, Debug, State).
 
 %% @doc TODO
-loop(Parent, Debug, #state{pids=Pids0, module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
+loop(Parent, Debug,
+     #state{pids=Pids0, module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
     %% Terminate pids that might still be running.
-    TerminateFun = fun(Pid) ->
-                           exit(Pid, kill)
-                   end,
-    [TerminateFun(Pid) || Pid <- Pids0],
+    terminate(Pids0),
 
     %% Get self.
     Self = self(),
@@ -129,6 +127,18 @@ loop(Parent, Debug, #state{pids=Pids0, module=Module, module_state=ModuleState0,
 
     %% Wait for responses.
     receive
+        hibernate ->
+            %% Terminate pids.
+            terminate(Pids),
+
+            %% Hibernate
+            proc_lib:hibernate(?MODULE,
+                               loop,
+                               [Parent,
+                                Debug,
+                                State#state{module_state=ModuleState0,
+                                            cache=Cache0,
+                                            pids=[]}]);
         {system, From, Request} ->
             sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State),
             loop(Parent, Debug, State#state{module_state=ModuleState0, cache=Cache0, pids=Pids});
@@ -178,3 +188,12 @@ system_get_state(State) ->
 system_replace_state(StateFun, State) ->
     NewState = StateFun(State),
     {ok, NewState, NewState}.
+
+%% @private
+terminate(Pids) ->
+    %% Terminate pids that might still be running.
+    TerminateFun = fun(Pid) ->
+                           exit(Pid, kill)
+                   end,
+    _ = [TerminateFun(Pid) || Pid <- Pids],
+    ok.

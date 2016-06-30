@@ -28,7 +28,7 @@
 -endif.
 
 %% API
--export([start_link/1]).
+-export([start_link/1, start_link/2]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
@@ -42,6 +42,9 @@
 
 start_link(Args) ->
     gen_flow:start_link([?MODULE, Args]).
+
+start_link(Events, Args) ->
+    gen_flow:start_link([?MODULE, Args, Events]).
 
 %%%===================================================================
 %%% Callbacks
@@ -59,17 +62,17 @@ read(State) ->
 
 %% @doc Computation to execute when inputs change.
 process(Args, #state{source=Source}=State) ->
-    case Args of
+    Processed = case Args of
         [undefined, _] ->
-            ok;
+            false;
         [_, undefined] ->
-            ok;
+            false;
         [X, Y] ->
             Set = sets:intersection(X, Y),
             Source ! {ok, sets:to_list(Set)},
-            ok
+            true
     end,
-    {ok, State}.
+    {ok, {Processed, State}}.
 
 -ifdef(TEST).
 

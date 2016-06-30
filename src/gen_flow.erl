@@ -111,7 +111,6 @@ loop(Parent, Debug, #state{pids=Pids0,
     %% Terminate pids that might still be running.
     terminate(Pids0),
 
-    io:format("Iteration ~B~n", [MaxEvents]),
     % If we have reached the max number of events, stop the process
     case MaxEvents of
         0 -> system_terminate(max_events, Parent, Debug, State);

@@ -52,7 +52,7 @@
 
 -callback init(list(term())) -> {ok, state()}.
 -callback read(state()) -> {ok, [function()], state()}.
--callback process(list(term()), state()) -> {ok, state()}.
+-callback process(list(term()), state()) -> {ok, {boolean(), state()}}.
 
 %%%===================================================================
 %%% API
@@ -111,6 +111,7 @@ loop(Parent, Debug, #state{pids=Pids0,
     %% Terminate pids that might still be running.
     terminate(Pids0),
 
+    io:format("Iteration ~B~n", [MaxEvents]),
     % If we have reached the max number of events, stop the process
     case MaxEvents of
         0 -> system_terminate(max_events, Parent, Debug, State);
@@ -178,7 +179,7 @@ loop(Parent, Debug, #state{pids=Pids0,
             RealizedCache = [Value || {_, Value} <- orddict:to_list(Cache)],
 
             %% Call process function.
-            {ok, ModuleState} = Module:process(RealizedCache, ReadState),
+            {ok, {Processed, ModuleState}} = Module:process(RealizedCache, ReadState),
 
             %% If a maximum number of events was given, update the count.
             case MaxEvents of
@@ -187,10 +188,14 @@ loop(Parent, Debug, #state{pids=Pids0,
                                                      cache=Cache,
                                                      module_state=ModuleState});
                 _ ->
+                    Events = case Processed of
+                        true -> MaxEvents - 1;
+                        _ -> MaxEvents
+                    end,
                     loop(Parent, Debug1, State#state{pids=Pids,
                                                      cache=Cache,
-                                                     module_state=ModuleState,
-                                                     max_events=MaxEvents - 1})
+                                                     max_events=Events,
+                                                     module_state=ModuleState})
             end;
 
         {'EXIT', Parent, Reason} ->

@@ -33,7 +33,7 @@
          system_replace_state/2]).
 
 %% Callbacks
--export([init/3]).
+-export([init/3, init/4]).
 
 %% Ignore explicit termination warning.
 -dialyzer([{nowarn_function, [system_terminate/4]}]).
@@ -47,7 +47,8 @@
 -record(state, {pids :: [pid()],
                 module :: atom(),
                 module_state :: term(),
-                cache :: orddict:orddict()}).
+                cache :: orddict:orddict(),
+                max_events :: non_neg_integer() | undefined}).
 
 -callback init(list(term())) -> {ok, state()}.
 -callback read(state()) -> {ok, [function()], state()}.
@@ -58,7 +59,10 @@
 %%%===================================================================
 
 start_link([Module, Args]) ->
-    proc_lib:start_link(?MODULE, init, [self(), Module, Args]).
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args]);
+
+start_link([Module, Args, MaxEvents]) ->
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args, MaxEvents]).
 
 %% @doc Provided for backwards compatibility.
 start_link(Module, Args) ->
@@ -70,6 +74,9 @@ start_link(Module, Args) ->
 
 %% @doc TODO
 init(Parent, Module, Args) ->
+    init(Parent, Module, Args, undefined).
+
+init(Parent, Module, Args, MaxEvents) ->
     %% Trap exits from children.
     process_flag(trap_exit, true),
 
@@ -89,15 +96,26 @@ init(Parent, Module, Args) ->
     State = #state{pids=[],
                    module=Module,
                    module_state=ModuleState,
-                   cache=orddict:new()},
+                   cache=orddict:new(),
+                   max_events=MaxEvents},
 
     loop(Parent, Debug, State).
 
 %% @doc TODO
-loop(Parent, Debug,
-     #state{pids=Pids0, module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
+loop(Parent, Debug, #state{pids=Pids0,
+                           cache=Cache0,
+                           module=Module,
+                           max_events=MaxEvents,
+                           module_state=ModuleState0}=State) ->
+
     %% Terminate pids that might still be running.
     terminate(Pids0),
+
+    % If we have reached the max number of events, stop the process
+    case MaxEvents of
+        0 -> system_terminate(max_events, Parent, Debug, State);
+        _ -> ok
+    end,
 
     %% Get self.
     Self = self(),
@@ -145,6 +163,7 @@ loop(Parent, Debug,
         {system, From, Request} ->
             sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State),
             loop(Parent, Debug, State#state{module_state=ModuleState0, cache=Cache0, pids=Pids});
+
         {ok, X, V} ->
             %% Log result.
             Debug1 = sys:handle_debug(Debug,
@@ -161,8 +180,19 @@ loop(Parent, Debug,
             %% Call process function.
             {ok, ModuleState} = Module:process(RealizedCache, ReadState),
 
-            %% Wait.
-            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache, pids=Pids});
+            %% If a maximum number of events was given, update the count.
+            case MaxEvents of
+                undefined ->
+                    loop(Parent, Debug1, State#state{pids=Pids,
+                                                     cache=Cache,
+                                                     module_state=ModuleState});
+                _ ->
+                    loop(Parent, Debug1, State#state{pids=Pids,
+                                                     cache=Cache,
+                                                     module_state=ModuleState,
+                                                     max_events=MaxEvents - 1})
+            end;
+
         {'EXIT', Parent, Reason} ->
             exit(Reason)
     after

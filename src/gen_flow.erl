@@ -101,6 +101,9 @@ init(Parent, Module, Args, MaxEvents) ->
 
     loop(Parent, Debug, State).
 
+% If we have reached the max number of events, stop the process
+loop(_, _, #state{pids=Pids, max_events=0}) -> terminate(Pids), ok;
+
 %% @doc TODO
 loop(Parent, Debug, #state{pids=Pids0,
                            cache=Cache0,
@@ -110,12 +113,6 @@ loop(Parent, Debug, #state{pids=Pids0,
 
     %% Terminate pids that might still be running.
     terminate(Pids0),
-
-    % If we have reached the max number of events, stop the process
-    case MaxEvents of
-        0 -> system_terminate(max_events, Parent, Debug, State);
-        _ -> ok
-    end,
 
     %% Get self.
     Self = self(),

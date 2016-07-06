@@ -22,8 +22,8 @@
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
 %% API
--export([start_link/1,
-         start_link/2,
+-export([start_link/2,
+         start_link/3,
          loop/3]).
 
 %% System message callbacks
@@ -33,7 +33,7 @@
          system_replace_state/2]).
 
 %% Callbacks
--export([init/3, init/4]).
+-export([init/4]).
 
 %% Ignore explicit termination warning.
 -dialyzer([{nowarn_function, [system_terminate/4]}]).
@@ -58,24 +58,17 @@
 %%% API
 %%%===================================================================
 
-start_link([Module, Args]) ->
-    proc_lib:start_link(?MODULE, init, [self(), Module, Args]);
-
-start_link([Module, Args, MaxEvents]) ->
-    proc_lib:start_link(?MODULE, init, [self(), Module, Args, MaxEvents]).
-
-%% @doc Provided for backwards compatibility.
 start_link(Module, Args) ->
-    proc_lib:start_link(?MODULE, init, [self(), Module, Args]).
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args, undefined]).
+
+start_link(Module, MaxEvents, Args) ->
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args, MaxEvents]).
 
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
 %% @doc TODO
-init(Parent, Module, Args) ->
-    init(Parent, Module, Args, undefined).
-
 init(Parent, Module, Args, MaxEvents) ->
     %% Trap exits from children.
     process_flag(trap_exit, true),

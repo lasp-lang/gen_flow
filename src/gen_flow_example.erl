@@ -41,10 +41,10 @@
 %%%===================================================================
 
 start_link(Args) ->
-    gen_flow:start_link([?MODULE, Args]).
+    gen_flow:start_link(?MODULE, Args).
 
 start_link(Events, Args) ->
-    gen_flow:start_link([?MODULE, Args, Events]).
+    gen_flow:start_link(?MODULE, Events, Args).
 
 %%%===================================================================
 %%% Callbacks

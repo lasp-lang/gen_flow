@@ -5,9 +5,12 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib,
-                  lager
+                  stdlib
                  ]},
   {modules, []},
-  {env, []}
+  {env, []},
+
+  {maintainers, ["Chris Meiklejohn", "Borja o'Cook"]},
+  {licenses, ["Apache 2.0"]},
+  {links, [{"Github", "https://github.com/lasp-lang/gen_flow"}]}
  ]}.

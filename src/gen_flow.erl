@@ -107,6 +107,9 @@ loop(Parent, Debug, #state{pids=Pids0,
     %% Terminate pids that might still be running.
     terminate(Pids0),
 
+    %% Clear EXIT messages from previous pids
+    clear_exit_inbox(Parent),
+
     %% Get self.
     Self = self(),
 
@@ -189,6 +192,7 @@ loop(Parent, Debug, #state{pids=Pids0,
 
         {'EXIT', Parent, Reason} ->
             exit(Reason)
+
     after
         60000 ->
             %% If 60 seconds go by, relaunch.
@@ -220,6 +224,15 @@ system_replace_state(StateFun, State) ->
 clear_inbox() ->
     receive
         _ -> clear_inbox()
+    after
+        0 -> ok
+    end.
+
+%% @private
+clear_exit_inbox(Parent) ->
+    receive
+        {'EXIT', Parent, Reason} -> exit(Reason);
+        {'EXIT', _, _} -> clear_exit_inbox(Parent)
     after
         0 -> ok
     end.
